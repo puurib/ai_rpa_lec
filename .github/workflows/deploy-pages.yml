@@ -1,4 +1,4 @@
-name: Deploy ABC Lab Campus to GitHub Pages
+name: Deploy AI Campus to GitHub Pages
 
 on:
   # Automatic publishing is paused. Run manually only when publishing is requested.
