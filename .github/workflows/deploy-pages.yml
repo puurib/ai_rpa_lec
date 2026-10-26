@@ -1,8 +1,7 @@
 name: Deploy ABC Lab Campus to GitHub Pages
 
 on:
-  push:
-    branches: [main]
+  # Automatic publishing is paused. Run manually only when publishing is requested.
   workflow_dispatch:
 
 permissions:
