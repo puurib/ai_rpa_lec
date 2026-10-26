@@ -1,66 +1,46 @@
 import { glossaryTerms } from './glossary-data.js';
-
+const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function initGlossary() {
-  const $ = (selector) => document.querySelector(selector);
-  const html = (value) => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-  const dialog = $('#glossary-dialog');
-  const search = $('#glossary-search');
-  const termList = $('#glossary-term-list');
-  let selectedId = glossaryTerms[0].id;
-  const findTerm = (id) => glossaryTerms.find((term) => term.id === id);
-  const featuredIds = ['ai', 'llm', 'prompt', 'agent', 'api', 'packet', 'token', 'rag'];
-
-  $('#glossary-cards').innerHTML = featuredIds.map((id) => {
-    const term = findTerm(id);
-    return '<button class="glossary-card" type="button" data-glossary-open="' + term.id + '" aria-haspopup="dialog" aria-controls="glossary-dialog" aria-label="' + html(term.name) + ' 쉬운 설명 보기"><span class="glossary-card-top"><strong>' + html(term.name) + '</strong><span aria-hidden="true">↗</span></span><small>' + html(term.pronunciation) + '</small><p>' + html(term.tagline) + '</p></button>';
-  }).join('');
-  $('#open-glossary').innerHTML = '전체 ' + glossaryTerms.length + '개 용어 보기 <span aria-hidden="true">↗</span>';
-
-  function renderTermList() {
-    const query = search.value.trim().toLocaleLowerCase('ko');
-    const filtered = glossaryTerms.filter((term) => [term.name, term.korean, term.pronunciation, term.english, term.category, term.tagline].join(' ').toLocaleLowerCase('ko').includes(query));
-    $('#glossary-search-count').textContent = query ? '검색 결과 ' + filtered.length + '개 / 전체 ' + glossaryTerms.length + '개' : '전체 ' + glossaryTerms.length + '개 용어';
-    $('#glossary-empty').hidden = filtered.length > 0;
-    termList.innerHTML = filtered.map((term) => '<button class="glossary-term-button" type="button" data-term="' + term.id + '" aria-current="' + (term.id === selectedId) + '" aria-controls="glossary-definition"><span>' + html(term.name) + '</span><small>' + html(term.category) + '</small></button>').join('');
-  }
-
-  function renderDefinition() {
-    const term = findTerm(selectedId);
-    const index = glossaryTerms.findIndex((item) => item.id === selectedId);
-    const related = term.related.map(findTerm).filter(Boolean);
-    $('#glossary-definition').innerHTML = '<p class="glossary-term-category">' + html(term.category) + '</p><h3 id="glossary-term-title" tabindex="-1">' + html(term.name) + '</h3><p class="glossary-full-name">' + html(term.english) + '<br />' + html(term.korean) + ' · 읽는 법: ' + html(term.pronunciation) + '</p><p class="glossary-simple">' + html(term.definition) + '</p><section class="glossary-explanation" aria-labelledby="glossary-analogy-title"><h4 id="glossary-analogy-title">일상에 비유하면</h4><p>' + html(term.analogy) + '</p></section><section class="glossary-explanation" aria-labelledby="glossary-example-title"><h4 id="glossary-example-title">업무에서는 이렇게</h4><p>' + html(term.example) + '</p></section><aside class="glossary-caution"><h4>헷갈리지 마세요</h4><p>' + html(term.caution) + '</p></aside><div class="glossary-related"><p>함께 알아두면 좋은 단어</p><div>' + related.map((item) => '<button type="button" data-related="' + item.id + '">' + html(item.name) + ' ↗</button>').join('') + '</div></div><div class="glossary-bottom"><button type="button" data-glossary-step="-1"' + (index === 0 ? ' disabled' : '') + '>← 이전 단어</button><span>' + (index + 1) + ' / ' + glossaryTerms.length + '</span><button type="button" data-glossary-step="1"' + (index === glossaryTerms.length - 1 ? ' disabled' : '') + '>다음 단어 →</button></div><p class="glossary-analogy-note">비유는 이해를 돕기 위한 설명이며, 실제 기술의 모든 특징을 나타내지는 않습니다.</p>';
-  }
-
-  function selectTerm(id, clearSearch = false) {
-    if (!findTerm(id)) return;
-    selectedId = id;
-    if (clearSearch) search.value = '';
-    renderTermList();
-    renderDefinition();
-    if (!dialog.open) dialog.showModal();
-    $('#glossary-term-title').focus();
-    termList.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }
-  $('#glossary-cards').addEventListener('click', (event) => {
-    const button = event.target.closest('[data-glossary-open]');
-    if (button) selectTerm(button.dataset.glossaryOpen, true);
-  });
-  $('#open-glossary').addEventListener('click', () => selectTerm('ai', true));
-  $('#close-glossary').addEventListener('click', () => dialog.close());
-  termList.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-term]');
-    if (button) selectTerm(button.dataset.term);
-  });
-  search.addEventListener('input', renderTermList);
-  $('#glossary-clear').addEventListener('click', () => { search.value = ''; renderTermList(); search.focus(); });
-  $('#glossary-definition').addEventListener('click', (event) => {
-    const related = event.target.closest('[data-related]');
-    if (related) { selectTerm(related.dataset.related, true); return; }
-    const step = event.target.closest('[data-glossary-step]');
-    if (!step || step.disabled) return;
-    const index = glossaryTerms.findIndex((term) => term.id === selectedId);
-    const next = glossaryTerms[index + Number(step.dataset.glossaryStep)];
-    if (next) selectTerm(next.id, true);
-  });
-  renderTermList();
+ const $ = s => document.querySelector(s);
+ const dialog = $('#glossary-dialog');
+ let activeId = glossaryTerms[0].id, category = '전체', pageQuery = '', dialogQuery = '';
+ const searchTerms = (query, selected='전체') => glossaryTerms.filter(t => (selected==='전체'||t.category===selected) && [t.name,t.korean,t.english,t.pronunciation,t.tagline].join(' ').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+ const categories = ['전체',...new Set(glossaryTerms.map(t=>t.category))];
+ $('#term-page-filters').innerHTML = categories.map(c=>'<button type="button" class="filter" data-term-category="'+esc(c)+'" aria-pressed="'+(c===category)+'">'+esc(c)+'</button>').join('');
+ function renderCards() {
+  const terms = searchTerms(pageQuery,category);
+  $('#glossary-cards').innerHTML = terms.map(t=>'<button type="button" class="glossary-card" data-term="'+esc(t.id)+'"><span class="glossary-card-top"><strong>'+esc(t.name)+'</strong><span aria-hidden="true">↗</span></span><small>'+esc(t.korean)+'</small><p>'+esc(t.tagline)+'</p></button>').join('');
+  $('#term-page-count').textContent = terms.length+'개 용어 / 전체 '+glossaryTerms.length+'개';
+  $('#term-page-empty').hidden = terms.length>0;
+ }
+ function renderList() {
+  const terms = searchTerms(dialogQuery);
+  $('#glossary-search-count').textContent = terms.length+'개 용어';
+  $('#glossary-term-list').innerHTML = terms.length ? terms.map(t=>'<button type="button" class="glossary-term-button" data-term="'+esc(t.id)+'" aria-current="'+(activeId===t.id)+'"><span>'+esc(t.name)+'</span><small>'+esc(t.pronunciation)+'</small></button>').join('') : '<p class="glossary-empty">일치하는 용어가 없어요. 검색어를 줄여보세요.</p>';
+ }
+ function renderDefinition(focus) {
+  const term = glossaryTerms.find(t=>t.id===activeId);
+  const index = glossaryTerms.indexOf(term);
+  $('#glossary-definition').innerHTML = '<p class="glossary-term-category">'+esc(term.category)+'</p><h3 id="glossary-term-title" tabindex="-1">'+esc(term.name)+'</h3><p class="glossary-full-name">'+esc(term.english)+' · '+esc(term.pronunciation)+'</p><p class="glossary-simple">'+esc(term.definition)+'</p><section class="glossary-explanation"><h4>익숙한 말로 바꾸면</h4><p>'+esc(term.analogy)+'</p></section><section class="glossary-explanation"><h4>업무에서는 이렇게</h4><p>'+esc(term.example)+'</p></section><section class="glossary-caution"><h4>이 점은 기억해요</h4><p>'+esc(term.caution)+'</p></section><div class="glossary-related"><p>함께 보면 좋은 말</p><div>'+term.related.map(id=>glossaryTerms.find(t=>t.id===id)).filter(Boolean).map(t=>'<button type="button" data-term="'+esc(t.id)+'">'+esc(t.name)+'</button>').join('')+'</div></div><div class="glossary-bottom"><button type="button" data-term-step="-1"'+(index===0?' disabled':'')+'>← 이전 용어</button><span>'+(index+1)+' / '+glossaryTerms.length+'</span><button type="button" data-term-step="1"'+(index===glossaryTerms.length-1?' disabled':'')+'>다음 용어 →</button></div><p class="glossary-analogy-note">비유는 이해를 돕는 예시이며 실제 기술의 모든 특성을 나타내지는 않아요.</p>';
+  renderList();
+  if(focus){ dialog.scrollTop=0; $('#glossary-term-title').focus({preventScroll:true}); }
+ }
+ function openTerm(id) {
+  if(!glossaryTerms.some(t=>t.id===id)) return;
+  activeId=id;
+  if(!dialog.open){ dialogQuery=''; $('#glossary-search').value=''; renderDefinition(false); dialog.showModal(); }
+  renderDefinition(true);
+ }
+ document.addEventListener('click',event=>{
+  const termButton=event.target.closest('[data-term]');
+  if(termButton)openTerm(termButton.dataset.term);
+  const step=event.target.closest('[data-term-step]');
+  if(step){const index=glossaryTerms.findIndex(t=>t.id===activeId)+Number(step.dataset.termStep); if(glossaryTerms[index])openTerm(glossaryTerms[index].id);}
+ });
+ $('#close-glossary').addEventListener('click',()=>dialog.close());
+ $('#glossary-search').addEventListener('input',event=>{dialogQuery=event.target.value;renderList();});
+ $('#term-page-search').addEventListener('input',event=>{pageQuery=event.target.value;renderCards();});
+ $('#term-page-filters').addEventListener('click',event=>{const b=event.target.closest('[data-term-category]');if(!b)return;category=b.dataset.termCategory;$('#term-page-filters').querySelectorAll('button').forEach(item=>item.setAttribute('aria-pressed',String(item===b)));renderCards();});
+ renderCards(); renderList(); renderDefinition(false);
+ return {openTerm};
 }

@@ -1,0 +1,15 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { courses, templates, referenceSources } from '../src/brand.js';
+import { glossaryTerms } from '../src/glossary-data.js';
+import { curationDocuments, evaluateCuration } from '../src/activities.js';
+test('AI is primary and RPA is one supporting lesson',()=>{assert.equal(courses.length,5);assert.equal(courses.flatMap(c=>c.lessons).length,14);assert.equal(courses.find(c=>c.id==='rpa').lessons.length,1);assert.equal(courses.at(-1).id,'rpa');});
+test('all lesson IDs are unique and all lessons contain a practice task',()=>{const lessons=courses.flatMap(c=>c.lessons);assert.equal(new Set(lessons.map(l=>l.id)).size,lessons.length);for(const l of lessons){assert.ok(l.title&&l.intro&&l.task);assert.ok(l.points.length>=3);}});
+test('curation covers duplicates, categories, conflicts and evidence',()=>{const lessons=courses.find(c=>c.id==='data').lessons;assert.deepEqual(lessons.map(l=>l.id),['data-duplicates','data-categories','data-conflicts','data-readiness']);});
+test('glossary links resolve and no duplicate term IDs exist',()=>{const ids=new Set(glossaryTerms.map(t=>t.id));assert.equal(ids.size,glossaryTerms.length);assert.equal(ids.size,21);for(const t of glossaryTerms){for(const id of t.related)assert.ok(ids.has(id));assert.ok(t.definition&&t.analogy&&t.example&&t.caution);}});
+test('all prompts explicitly use synthetic data and have five fields',()=>{assert.equal(templates.length,3);for(const t of templates){for(const label of ['역할:','목표:','자료:','조건:','형식:'])assert.ok(t.text.includes(label));assert.ok(t.text.includes('가상'));assert.equal(t.text.split('\n').length,5);}});
+test('reference links are HTTPS and include both requested videos',()=>{for(const r of referenceSources)assert.ok(r.url.startsWith('https://'));for(const id of ['N3st1ZrB_zc','T4e0T8fBllM'])assert.ok(referenceSources.some(r=>r.url.includes(id)));});
+test('empty curation choices are incomplete',()=>{const r=evaluateCuration();assert.equal(r.complete,false);assert.equal(r.score,0);assert.equal(r.total,12);});
+test('correct curation answers score 12 out of 12',()=>{const answers=Object.fromEntries(curationDocuments.map(d=>[d.id,{scope:d.scope,action:d.action}]));const r=evaluateCuration(answers);assert.equal(r.complete,true);assert.equal(r.score,12);});
+test('different scope and unresolved drafts are not merged into current evidence',()=>{const docs=Object.fromEntries(curationDocuments.map(d=>[d.id,d]));assert.equal(docs.D1.action,'archive');assert.equal(docs.D2.action,'merge');assert.equal(docs.D3.action,'use');assert.equal(docs.D4.action,'use');assert.notEqual(docs.D3.scope,docs.D4.scope);assert.equal(docs.D5.action,'hold');assert.equal(docs.D6.action,'hold');});
+test('wrong actions are graded independently from categories',()=>{const answers=Object.fromEntries(curationDocuments.map(d=>[d.id,{scope:d.scope,action:'hold'}]));const r=evaluateCuration(answers);assert.equal(r.complete,true);assert.equal(r.score,8);});
