@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { courses, templates, referenceSources } from '../src/brand.js';
 import { glossaryTerms } from '../src/glossary-data.js';
-import { curationDocuments, evaluateCuration } from '../src/activities.js';
+import { curationDocuments, evaluateCuration, buildPracticePrompt } from '../src/activities.js';
 test('AI is primary and RPA is one supporting lesson',()=>{assert.equal(courses.length,5);assert.equal(courses.flatMap(c=>c.lessons).length,14);assert.equal(courses.find(c=>c.id==='rpa').lessons.length,1);assert.equal(courses.at(-1).id,'rpa');});
 test('all lesson IDs are unique and all lessons contain a practice task',()=>{const lessons=courses.flatMap(c=>c.lessons);assert.equal(new Set(lessons.map(l=>l.id)).size,lessons.length);for(const l of lessons){assert.ok(l.title&&l.intro&&l.task);assert.ok(l.points.length>=3);}});
 test('curation covers duplicates, categories, conflicts and evidence',()=>{const lessons=courses.find(c=>c.id==='data').lessons;assert.deepEqual(lessons.map(l=>l.id),['data-duplicates','data-categories','data-conflicts','data-readiness']);});
@@ -13,3 +13,5 @@ test('empty curation choices are incomplete',()=>{const r=evaluateCuration();ass
 test('correct curation answers score 12 out of 12',()=>{const answers=Object.fromEntries(curationDocuments.map(d=>[d.id,{scope:d.scope,action:d.action}]));const r=evaluateCuration(answers);assert.equal(r.complete,true);assert.equal(r.score,12);});
 test('different scope and unresolved drafts are not merged into current evidence',()=>{const docs=Object.fromEntries(curationDocuments.map(d=>[d.id,d]));assert.equal(docs.D1.action,'archive');assert.equal(docs.D2.action,'merge');assert.equal(docs.D3.action,'use');assert.equal(docs.D4.action,'use');assert.notEqual(docs.D3.scope,docs.D4.scope);assert.equal(docs.D5.action,'hold');assert.equal(docs.D6.action,'hold');});
 test('wrong actions are graded independently from categories',()=>{const answers=Object.fromEntries(curationDocuments.map(d=>[d.id,{scope:d.scope,action:'hold'}]));const r=evaluateCuration(answers);assert.equal(r.complete,true);assert.equal(r.score,8);});
+
+test('prompt builder has one consistent selected output format',()=>{for(const t of templates){const prompt=buildPracticePrompt(t,'경영진','항목별 표');const formatLines=prompt.split(String.fromCharCode(10)).filter(line=>line.startsWith('형식:'));assert.equal(formatLines.length,1);assert.ok(formatLines[0].includes('항목별 표'));assert.ok(prompt.includes('읽는 사람: 경영진'));assert.ok(prompt.includes('가상'));}});
