@@ -21,5 +21,6 @@
   ],
   "security": "실제 회사정보·내부 시스템·실적·전략·고객·인사·인증정보를 사용하지 않음. 실습은 처음부터 만든 가상 자료만 사용.",
   "preserved": "src/scene.js 원본 3D 신경망 구체와 모션",
-  "deployment": "비공개 유지. 과거 이력의 제외 대상 회사정보가 남아 있어 공개 전환 및 배포 보류."
+  "deployment": "사용자 공개 승인. https://puurib.github.io/ai_rpa_lec/ 프로젝트 주소를 수동 배포. 자동 push 배포 없음. 루트 사이트 변경 중단 및 설정 복원.",
+  "repository": "https://github.com/puurib/ai_rpa_lec"
 }
